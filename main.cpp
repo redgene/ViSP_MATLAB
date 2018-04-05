@@ -5,75 +5,83 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+//! [Include]
 #include <matrix.h>
 #include <engine.h>
 #include <visp3/core/vpMatrix.h>
+//! [Include]
 
 int main()
-{
-	// MATLAB Engine
-	Engine *ep;
-	
-	// MATLAB array to store input data to MATLAB
-	mxArray *T = NULL;	
-	
-	// MATLAB array to store output data from MATLAB
-	mxArray *D = NULL;
-
+{ 
 	// ViSP matrix containing input data
+	//! [InputData]
 	vpMatrix x(3, 3, 0);
 	x[0][0] = 1; x[0][1] = 2; x[0][2] = 3;
 	x[1][0] = 4; x[1][1] = 5; x[1][2] = 6;
 	x[2][0] = 7; x[2][1] = 8; x[2][2] = 9;
+	//! [InputData]
 	int xCols = x.getCols();
 	int xRows = x.getRows();
 
-	// Interface variables between ViSP and MATLAB variables
-	// Temporary variable to hold Input data 
-	double inp[9];
+	//! [MATLABVariables]
+	// MATLAB Engine	
+	Engine *ep;
+	
+	// MATLAB array to store input data to MATLAB
+	mxArray *T = mxCreateDoubleMatrix(xRows, xCols, mxREAL); 
+	
+	// MATLAB array to store output data from MATLAB
+	mxArray *D = NULL;
+	//! [MATLABVariables]
+
 	// Temporary variable to hold Output data 
 	double res[3];
 	int resRows = 1, resCols = 3;
-
-	// Copy data from ViSP matrix x to temporary variable inp
-	for (size_t i = 0; i < xCols * xRows; i++)	
-		inp[i] = x.data[i];
 
 	// Display input data to the user
 	std::cout << "ViSP Input Matrix:" << std::endl;
 	for (size_t i = 0; i < xRows; i++) {
 		for (size_t j = 0; j < xCols; j++) 
-			std::cout << inp[i * xCols + j] << " ";		
+			std::cout << x.data[i * xCols + j] << " ";
 		std::cout << std::endl;
 	}
-		
+	
 	// Start a MATLAB Engine process using engOpen
+	//! [EngineOpen]
 	if (!(ep = engOpen(""))) {
 		fprintf(stderr, "\nCan't start MATLAB engine\n");
 		return EXIT_FAILURE;
 	}
-	
-	// Create a MATLAB matrix variable for our data
-	T = mxCreateDoubleMatrix(3, 3, mxREAL);	
-	
-	// Copy the contents of ViSP matrix (available in temp) to the MATLAB matrix variable T
-	memcpy((void *)mxGetPr(T), (void *)inp, sizeof(inp));
-	
+	//! [EngineOpen]
+
+	// Copy the contents of ViSP matrix to the MATLAB matrix variable T	
+	//! [CopyToVariable]
+	memcpy((void *)mxGetPr(T), (void *)x.data, xRows * xCols *sizeof(double));
+	//! [CopyToVariable]
+		
 	// Place the variable T into the MATLAB workspace
-	engPutVariable(ep, "T", T);
+	//! [AddToWorkspace]
+	engPutVariable(ep, "Tm", T);
+	//! [AddToWorkspace]
 
 	// Determine the sum of each column of input matrix x
 	// ViSP matrix is row-major and MATLAB matrix is column-major, so transpose the matrix T before evaluation
-	engEvalString(ep, "D = sum(T');");
+	//! [EvalFunction]
+	engEvalString(ep, "Dm = sum(Tm');");
+	//! [EvalFunction]
 
 	// Get the variable D from the MATLAB workspace
-	D = engGetVariable(ep, "D");
+	//! [GetFromWorkspace]
+	D = engGetVariable(ep, "Dm");
+	//! [GetFromWorkspace]
 
 	// Copy the contents of MATLAB variable D to local variable res
+	//! [CopyFromVariable]
 	memcpy((void *)res, (void *)mxGetPr(D), sizeof(res));
-	
+	//! [CopyFromVariable]
+
 	// Display output data to the user
-	std::cout << std::endl << "MATLAB Output Matrix:" << std::endl;
+	std::cout << std::endl << "MATLAB Output Matrix (Column-wise sum):" << std::endl;
 	for (size_t i = 0; i < resCols; i++)
 		std::cout << res[i] << " ";	
 	std::cout << std::endl;
@@ -83,10 +91,12 @@ int main()
 	fgetc(stdin);
 	
 	// Free memory, close MATLAB Engine and Exit
+	//! [Exit]
 	mxDestroyArray(T);
 	mxDestroyArray(D);
 	engEvalString(ep, "close;");
 	engClose(ep);
+	//! [Exit]
 
 	return EXIT_SUCCESS;
 }
